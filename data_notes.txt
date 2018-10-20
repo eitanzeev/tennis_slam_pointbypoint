@@ -1,0 +1,3 @@
+Point Winner refers to the previous row. I.e. the first point of every match has no point winner. The last row of every
+record is not a physical point, but records results of the end of the previous point.
+
