@@ -55,3 +55,26 @@ point.loc[p2_sp_normal | p2_sp_tiebreak | p2_break_set, 'P2SetPoint'] = 1
 # === Match Point Column ===
 # Need to calculate a match point column, but have to calculate set point columns first
 
+
+# ================ Dataset preparation =================
+def game_score(df):
+    """ Returns the game score in the format of "Server Score - Receiver Score """
+    df['Score'] = 0
+    df.loc[df['PointServer']==0, 'Score'] = '0-0'
+    df.loc[df['PointServer']==1, 'Score'] = df['P1Score'].astype(str) + '-' + df['P2Score'].astype(str)
+    df.loc[df['PointServer']==2, 'Score'] = df['P2Score'].astype(str) + '-' + df['P1Score'].astype(str)
+
+    return df['Score']
+
+
+def is_pressure(df, pressure_points):
+    """ Determines whether or not a point is a pressure point
+    df = the point by point data
+    scores = a list of "pressure" points, defined as 'Server - Receiver Score'
+    Returns a binary column, 'Pressure' """
+
+    return df['Score'].isin(pressure_points).astype(int)
+
+pressure_points = ['15-40', '30-40', '40-40', '40-99', '30-30', '0-30', '0-40']
+point['Score'] = game_score(point)
+point['Pressure'] = is_pressure(point, pressure_points=pressure_points)
