@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 # ================ Dataset preparation =================
 
@@ -125,14 +126,12 @@ if __name__ == '__main__':
     pressure_players_2 = pressure[pressure['match_num'] < 2000] \
         .groupby('player2').agg({'Pressure': 'sum', 'PointNumber': 'count'})
 
-    p = pressure_players_1 + pressure_players_2
-    p.plot(x='PointNumber', y='Pressure', kind='scatter')
-    print(p.sort_values('PointNumber', ascending=False).head(10))
-    """
-    pressure_players = pressure[pressure['match_num']<2000]\
-                       .groupby('player1').agg({'Pressure':'sum', 'PointNumber':'count'})\
-                       .sort_values('Pressure', ascending=False)
+    p = pressure_players_1.add(pressure_players_2, axis=0, fill_value=0).dropna()
 
-    pressure_players.sort_values('Pressure',ascending=False)
-    
-    """
+    x = p['PointNumber']
+    y = p['Pressure']
+    plt.scatter(x=x, y=y)
+    for i, pname in enumerate(p.index.tolist()):
+        if (x[i] > 800):
+        plt.annotate(pname, (x[i], y[i]))
+    plt.show()

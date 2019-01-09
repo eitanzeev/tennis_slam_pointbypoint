@@ -5,6 +5,14 @@ ehthumbs.db
 # Folder config file
 Desktop.ini
 
+# Data files
+*.csv
+*.xlsx
+
+# Idea files (what are these?)
+*.xml
+*.iml
+
 # Recycle Bin used on file shares
 $RECYCLE.BIN/
 
