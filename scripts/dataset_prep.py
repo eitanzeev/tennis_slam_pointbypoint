@@ -97,12 +97,12 @@ def create_pressure_col(df, pressure_points):
 if __name__ == '__main__':
 
     #### Read in inputs
-    fpath = 'C://Users/srirri02/Documents/Python Scripts/tennis/tennis_slam_pointbypoint/'
+    dirpath = 'C://Users/srirri02/Documents/Python Scripts/tennis/tennis_slam_pointbypoint/'
 
     # ====== Exploratory analysis using only 2017 wimbledon =========
     tourney_name = '2017-wimbledon'
-    matchfile = fpath + 'data/' + tourney_name + '-matches.csv'
-    pointfile = fpath + 'data/' + tourney_name + '-points.csv'
+    matchfile = dirpath + 'data/' + tourney_name + '-matches.csv'
+    pointfile = dirpath + 'data/' + tourney_name + '-points.csv'
     match = pd.read_csv(matchfile)
     point = pd.read_csv(pointfile)
 
@@ -111,27 +111,37 @@ if __name__ == '__main__':
                          on='match_id')
 
     # Adjustable inputs
-    pressure_points = ['15-40', '30-40', '40-40', '40-99', '30-30', '0-30', '0-40']
+    pressure_points = ['0-30', '0-40', '15-40', '30-40', '40-40', '40-99']
 
     # Prep Data
     point_adj_col = create_gamepoint_col(create_score_col(correct_columns(merged)))
+
     pressure = create_pressure_col(point_adj_col, pressure_points)
+    # Which players are the best at winning pressure points?
+    pressure['PressureHeld'] = (pressure['Pressure'] == 1) & (pressure['PointServer'] == pressure['CurrWinner'])
 
-    # this aggregation won't work because you can't aggregate only by player1
-    # people keep switching whether they're player1 or player2 in a given match
-
+    # Have to aggregate by both player 1 and player 2, then combine, because player1 v player 2 keeps switching
     pressure_players_1 = pressure[pressure['match_num'] < 2000] \
-        .groupby('player1').agg({'Pressure': 'sum', 'PointNumber': 'count'})
+        .groupby('player1').agg({'Pressure': 'sum', 'PointNumber': 'count', 'PressureHeld': 'sum'})
 
     pressure_players_2 = pressure[pressure['match_num'] < 2000] \
-        .groupby('player2').agg({'Pressure': 'sum', 'PointNumber': 'count'})
+        .groupby('player2').agg({'Pressure': 'sum', 'PointNumber': 'count', 'PressureHeld': 'sum'})
 
     p = pressure_players_1.add(pressure_players_2, axis=0, fill_value=0).dropna()
 
+    ######################### Should probably start moving this section over to another script
+
+    # Let's run a regression to see how well you can describe the relationship between pressure points and match length
+
     x = p['PointNumber']
     y = p['Pressure']
+    z = p['PressureHeld']
     plt.scatter(x=x, y=y)
+    plt.scatter(x=x, y=z)
     for i, pname in enumerate(p.index.tolist()):
         if (x[i] > 800):
-        plt.annotate(pname, (x[i], y[i]))
-    plt.show()
+            plt.annotate(pname, (x[i], z[i]))
+    #plt.show()
+
+    p['PressureWinPrct'] = p['PressureHeld'] / p['Pressure']
+    print(p.sort_values('PressureWinPrct', ascending=False))
