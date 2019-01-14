@@ -1,5 +1,7 @@
 import pandas as pd
 import numpy as np
+import os
+import itertools
 import matplotlib.pyplot as plt
 
 # ================ Dataset preparation =================
@@ -83,21 +85,68 @@ def create_matchpoint_col(df, match_format):
     """
 
 
-def create_pressure_col(df, pressure_points):
-    """ Returns a column denoting whether a point was a pressure point
-    df = the point by point data
-    scores = a list of "pressure" points, defined as 'Server - Receiver Score'
-    Returns a binary column, 'Pressure' """
+def create_pressure_cols(df, pressure_points):
+    """ Returns two columns:
+     Pressure denotes whether whether a point was a pressure point
+     PressureHeld denotes whether a player had a pressure point and won that point
+
+    df (dataframe) = the point by point data
+    pressure_points (list-like) = a list of "pressure" points, defined as 'Server - Receiver Score'
+    Both Pressure and PressureHeld will be binary columns """
+
     df['Pressure'] = df['Score'].isin(pressure_points).astype(int)
+    df['PressureHeld'] = (df['Pressure'] == 1) & (df['PointServer'] == df['CurrWinner'])
+
     return df
 
-# ================ Dataset preparation =================
+def get_slam_data(slams, years, fpath):
+    """ Aggregates data across as many grand slams as specified, for years specified
+    slam_name (list or str) : 'aus', 'fre', 'wim', 'uso', or 'all'
+    years = (list of ints or str) : list of years or 'all', for all available years
 
+    returns a dataframe of joined match and point data, for years and slams provided
+    """
+
+    assert slams=='all' or slams in ['all','aus','fre','wim','uso'], \
+           'get_slam_data: invalid slam name provided'
+    assert years=='all' or type(years)==list or list, 'get_slam_data: invalid years provided'
+
+    final_data = []
+    all_files = os.listdir(fpath)
+    slam_dict = {'aus':'ausopen','fre':'frenchopen','wim':'wimbledon','uso':'usopen'}
+
+    # slams should be a list; if a single string, it should be made a list w/ one element
+    if slams=='all':
+        slams = ['aus', 'fre', 'wim', 'uso']
+    elif type(slams)==str:
+        slams = [slams]
+
+    # Likewise, years should be a list of strings
+    if years=='all':
+        years = set([str(f.split('-')[0]) for f in all_files]) # all available years
+    if type(years) == list:
+        years = map(str, years)
+
+    slam_year_combinations = itertools.product(slams, years)
+    for slam,year in slam_year_combinations:
+        matchfile = fpath+'-'.join([year, slam_dict[slam], 'matches']) + '.csv'
+        pointfile = fpath+'-'.join([year, slam_dict[slam], 'points']) + '.csv'
+        match = pd.read_csv(matchfile)
+        point = pd.read_csv(pointfile)
+        key_cols = ['match_id', 'year', 'slam', 'match_num', 'player1', 'player2']
+        data = point.merge(match[key_cols], how='left', on='match_id')
+        final_data.append(data)
+
+    return pd.concat(final_data)
+
+# ================ Dataset preparation =================
 
 if __name__ == '__main__':
 
     #### Read in inputs
     dirpath = 'C://Users/srirri02/Documents/Python Scripts/tennis/tennis_slam_pointbypoint/'
+    merged = get_slam_data('wim',[2017],dirpath+'data/')
+    """
 
     # ====== Exploratory analysis using only 2017 wimbledon =========
     tourney_name = '2017-wimbledon'
@@ -109,6 +158,7 @@ if __name__ == '__main__':
     merged = point.merge(match[['match_id','year','slam','match_num','player1','player2']],
                          how='left',
                          on='match_id')
+    """
 
     # Adjustable inputs
     pressure_points = ['0-30', '0-40', '15-40', '30-40', '40-40', '40-99']
@@ -116,9 +166,8 @@ if __name__ == '__main__':
     # Prep Data
     point_adj_col = create_gamepoint_col(create_score_col(correct_columns(merged)))
 
-    pressure = create_pressure_col(point_adj_col, pressure_points)
-    # Which players are the best at winning pressure points?
-    pressure['PressureHeld'] = (pressure['Pressure'] == 1) & (pressure['PointServer'] == pressure['CurrWinner'])
+    pressure = create_pressure_cols(point_adj_col, pressure_points)
+
 
     # Have to aggregate by both player 1 and player 2, then combine, because player1 v player 2 keeps switching
     pressure_players_1 = pressure[pressure['match_num'] < 2000] \
@@ -129,19 +178,18 @@ if __name__ == '__main__':
 
     p = pressure_players_1.add(pressure_players_2, axis=0, fill_value=0).dropna()
 
-    ######################### Should probably start moving this section over to another script
+    p['PressureWinPrct'] = p['PressureHeld'] / p['Pressure']
 
     # Let's run a regression to see how well you can describe the relationship between pressure points and match length
 
     x = p['PointNumber']
     y = p['Pressure']
-    z = p['PressureHeld']
-    plt.scatter(x=x, y=y)
+    z = p['PressureWinPrct']
     plt.scatter(x=x, y=z)
+    plt.scatter(x=y, y=z)
     for i, pname in enumerate(p.index.tolist()):
         if (x[i] > 800):
             plt.annotate(pname, (x[i], z[i]))
-    #plt.show()
+    plt.show()
 
-    p['PressureWinPrct'] = p['PressureHeld'] / p['Pressure']
-    print(p.sort_values('PressureWinPrct', ascending=False))
+
